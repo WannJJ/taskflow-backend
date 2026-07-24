@@ -51,7 +51,8 @@ model Note {
   @@map("notes")
 }
 
-enum Status {
+enum TaskStatus {
+  BACKLOG
   TODO
   IN_PROGRESS
   DONE
@@ -61,4 +62,5 @@ enum Priority {
   LOW
   MEDIUM
   HIGH
+  URGENT
 }
