@@ -26,7 +26,7 @@ model Task {
   id          String    @id @default(uuid())
   title       String
   description String?
-  status      Status    @default(TODO)
+  status      TaskStatus    @default(TODO)
   priority    Priority  @default(MEDIUM)
   dueDate     DateTime? @map("due_date")
   createdAt   DateTime  @default(now()) @map("created_at")
