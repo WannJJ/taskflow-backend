@@ -6,16 +6,19 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
+  @ApiOperation({ summary: 'Đăng ký tài khoản mới' })
   async register(@Body() dto: RegisterDto) {
     const result = await this.authService.register(dto);
     return {
@@ -25,6 +28,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @ApiOperation({ summary: 'Đăng nhập' })
   async login(@Body() dto: LoginDto) {
     const result = await this.authService.login(dto);
     return {
@@ -34,10 +38,12 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard) // Route này cần token
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy thông tin user hiện tại' })
   async getProfile(@Request() req) {
     // req.user được gắn bởi JwtStrategy.validate()
-    const user = await this.authService.getProfile(req.user.userId);
+    const user = await this.authService.getProfile(req.user.id);
     return {
       success: true,
       data: user,

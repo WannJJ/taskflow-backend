@@ -18,6 +18,9 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
+  // ============================================
+  // REGISTER
+  // ============================================
   async register(dto: RegisterDto) {
     // 1. Kiểm tra email đã tồn tại chưa
     const existingUser = await this.prisma.user.findUnique({
@@ -31,30 +34,28 @@ export class AuthService {
     // 2. Hash password (bcrypt với 10 salt rounds)
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // 3. Tạo user mới
+    // 3. Tạo user
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         passwordHash,
-        displayName: dto.displayName || dto.email.split('@')[0], // Tên mặc định
+        displayName: dto.displayName,
       },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        createdAt: true,
-      },
+      select: { id: true, email: true, displayName: true, createdAt: true },
     });
 
-    // 4. Tạo tokens
+    // 4. Generate tokens
     const tokens = await this.generateTokens(user.id, user.email);
 
     return {
       user,
-      ...tokens,
+      accessToken: tokens.accessToken,
     };
   }
 
+  // ============================================
+  // LOGIN
+  // ============================================
   async login(dto: LoginDto) {
     // 1. Tìm user theo email
     const user = await this.prisma.user.findUnique({
@@ -75,17 +76,8 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
-    // 3. Tạo tokens
+    // 3. Generate tokens
     const tokens = await this.generateTokens(user.id, user.email);
-
-    // 4. Lưu refresh token vào DB (để sau này revoke nếu cần)
-    await this.prisma.refreshToken.create({
-      data: {
-        token: tokens.refreshToken,
-        userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 ngày
-      },
-    });
 
     return {
       user: {
@@ -93,27 +85,44 @@ export class AuthService {
         email: user.email,
         displayName: user.displayName,
       },
-      ...tokens,
+      accessToken: tokens.accessToken,
     };
   }
 
+  // ============================================
+  // GENERATE TOKENS
+  // ============================================
   private async generateTokens(userId: string, email: string) {
     const payload = { sub: userId, email };
 
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_ACCESS_EXPIRATION', '15m'),
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_REFRESH_EXPIRATION', '7d'),
-      }),
-    ]);
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_SECRET'),
+      expiresIn: this.configService.get('JWT_ACCESS_EXPIRATION') || '15m',
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_SECRET'),
+      expiresIn: this.configService.get('JWT_REFRESH_EXPIRATION') || '7d',
+    });
+
+    // Lưu refresh token vào DB (để sau này có thể revoke)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 ngày
+
+    await this.prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId,
+        expiresAt,
+      },
+    });
 
     return { accessToken, refreshToken };
   }
 
+  // ============================================
+  // GET PROFILE (sau này dùng cho /auth/me)
+  // ============================================
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

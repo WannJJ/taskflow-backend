@@ -1,3 +1,11 @@
+// ============================================
+// TaskFlow - Database Schema
+// ============================================
+// Mỗi lần sửa file này, chạy:
+//   npx prisma migrate dev --name <tên-migration>
+//   npx prisma generate
+// ============================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,48 +15,89 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// 1. USER (Người dùng)
+// ============================================
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
-  password     String
-  name         String?
-  refreshToken String?  @map("refresh_token")
+  passwordHash String   @map("password_hash")
+  displayName  String?  @map("display_name")
+  avatarUrl    String?  @map("avatar_url")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  tasks Task[]
-  notes Note[]
+  // Relations: 1 User có nhiều Projects, Tasks, Notes
+  projects      Project[]
+  tasks         Task[]
+  notes         Note[]
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
 
-model Task {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  status      TaskStatus    @default(TODO)
-  priority    Priority  @default(MEDIUM)
-  dueDate     DateTime? @map("due_date")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+// ============================================
+// 2. REFRESH TOKEN
+// ============================================
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("tasks")
+  @@map("refresh_tokens")
 }
 
-model Note {
-  id        String   @id @default(uuid())
-  title     String
-  content   String?
+// ============================================
+// 3. PROJECT (Dự án)
+// ============================================
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String? // Mã mã hex, ví dụ: "#3B82F6"
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tasks Task[]
+  notes Note[]
+
+  @@map("projects")
+}
+
+// ============================================
+// 4. TASK (Công việc)
+// ============================================
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  description String?    @db.Text
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?  @map("due_date")
+  position    Int        @default(0) // Thứ tự trong cột Kanban
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  userId String @map("user_id")
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@map("notes")
+  labels      Label[]      @relation("TaskLabels")
+  attachments Attachment[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@map("tasks")
 }
 
 enum TaskStatus {
@@ -63,4 +112,59 @@ enum Priority {
   MEDIUM
   HIGH
   URGENT
+}
+
+// ============================================
+// 5. NOTE (Ghi chú)
+// ============================================
+model Note {
+  id       String  @id @default(uuid())
+  title    String
+  content  String  @db.Text // Nội dung HTML/JSON từ TipTap
+  isPinned Boolean @default(false) @map("is_pinned")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?  @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  labels Label[] @relation("NoteLabels")
+
+  @@index([userId])
+  @@map("notes")
+}
+
+// ============================================
+// 6. LABEL (Nhãn/Tag)
+// ============================================
+model Label {
+  id    String @id @default(uuid())
+  name  String
+  color String // Mã mã hex
+
+  tasks Task[] @relation("TaskLabels")
+  notes Note[] @relation("NoteLabels")
+
+  @@map("labels")
+}
+
+// ============================================
+// 7. ATTACHMENT (Tệp đính kèm)
+// ============================================
+model Attachment {
+  id       String @id @default(uuid())
+  filename String
+  url      String // Link đến file (Cloudinary/S3)
+  mimeType String @map("mime_type") // image/png, application/pdf...
+  size     Int // Dung lượng bytes
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  taskId String @map("task_id")
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
 }
