@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Request,
   UseGuards,
@@ -9,6 +11,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -28,6 +31,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập' })
   async login(@Body() dto: LoginDto) {
     const result = await this.authService.login(dto);
@@ -37,12 +41,55 @@ export class AuthController {
     };
   }
 
+  // ============================================
+  // REFRESH TOKEN - Endpoint mới
+  // ============================================
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Làm mới Access Token' })
+  async refresh(@Body() dto: RefreshTokenDto) {
+    const result = await this.authService.refreshTokens(dto.refreshToken);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  // ============================================
+  // LOGOUT - Endpoint mới
+  // ============================================
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng xuất (xóa refresh token)' })
+  async logout(@Body() dto: RefreshTokenDto) {
+    await this.authService.logout(dto.refreshToken);
+    return {
+      success: true,
+      message: 'Đăng xuất thành công',
+    };
+  }
+
+  // ============================================
+  // LOGOUT ALL - Endpoint mới
+  // ============================================
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng xuất khỏi tất cả thiết bị' })
+  async logoutAll(@Request() req) {
+    await this.authService.logoutAll(req.user.id);
+    return {
+      success: true,
+      message: 'Đã đăng xuất khỏi tất cả thiết bị',
+    };
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy thông tin user hiện tại' })
   async getProfile(@Request() req) {
-    // req.user được gắn bởi JwtStrategy.validate()
     const user = await this.authService.getProfile(req.user.id);
     return {
       success: true,

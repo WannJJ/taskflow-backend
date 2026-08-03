@@ -73,6 +73,9 @@
       "json",
       "ts"
     ],
+    "prisma": {
+      "seed": "ts-node prisma/seed.ts"
+    },
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
