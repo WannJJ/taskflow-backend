@@ -11,6 +11,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
+// ============================================
+// Interface cho JWT Payload
+// Giúp TypeScript biết payload có những field gì
+// thay vì để là `any`
+// ============================================
+interface JwtPayload {
+  sub: string; // userId
+  email: string; // email
+  iat: number; // issued at (timestamp)
+  exp: number; // expiration (timestamp)
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -108,7 +120,7 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     try {
       // 1. Verify JWT signature
-      const payload = this.jwtService.verify(refreshToken, {
+      const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         secret: this.configService.get('JWT_SECRET'),
       });
 
@@ -120,6 +132,12 @@ export class AuthService {
 
       if (!storedToken) {
         throw new ForbiddenException('Refresh token không hợp lệ');
+      }
+
+      // 2.5. Double-check: userId trong JWT payload có khớp với DB không
+      // payload.sub chính là userId được gắn khi tạo token trong generateTokens()
+      if (storedToken.user.id !== payload.sub) {
+        throw new ForbiddenException('Token không khớp với user');
       }
 
       // 3. Kiểm tra token đã hết hạn chưa
@@ -148,12 +166,20 @@ export class AuthService {
       };
     } catch (error) {
       // Xử lý các lỗi JWT cụ thể
-      if (error.name === 'TokenExpiredError') {
-        throw new ForbiddenException('Refresh token đã hết hạn');
+      // Trong TypeScript strict mode, biến trong catch block
+      // có kiểu `unknown` (không phải `Error`). Không thể truy cập `.name`
+      // trực tiếp mà không type guard.
+      // Vậy nên: Dùng `instanceof Error` để type-narrowing.
+      // Sau khi check, TS biết chắc `error` là `Error` nên `.name` hợp lệ.
+      if (error instanceof Error) {
+        if (error.name === 'TokenExpiredError') {
+          throw new ForbiddenException('Refresh token đã hết hạn');
+        }
+        if (error.name === 'JsonWebTokenError') {
+          throw new ForbiddenException('Refresh token không hợp lệ');
+        }
       }
-      if (error.name === 'JsonWebTokenError') {
-        throw new ForbiddenException('Refresh token không hợp lệ');
-      }
+      // Nếu không phải Error instance (hiếm), throw lại nguyên bản
       throw error;
     }
   }
