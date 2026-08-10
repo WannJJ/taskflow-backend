@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -17,6 +16,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { TaskStatus } from '@prisma/client';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { RequestUser } from 'src/common/types/request.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { MoveTaskDto } from './dto/move-task.dto';
@@ -41,13 +42,13 @@ export class TasksController {
   @ApiQuery({ name: 'projectId', required: false })
   @ApiQuery({ name: 'search', required: false })
   async findAll(
-    @Request() req,
+    @CurrentUser() user: RequestUser,
     @Query('status') status?: TaskStatus,
     @Query('priority') priority?: string,
     @Query('projectId') projectId?: string,
     @Query('search') search?: string,
   ) {
-    const tasks = await this.tasksService.findAll(req.user.id, {
+    const tasks = await this.tasksService.findAll(user.id, {
       status,
       priority,
       projectId,
@@ -62,8 +63,8 @@ export class TasksController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết công việc' })
-  async findOne(@Param('id') id: string, @Request() req) {
-    const task = await this.tasksService.findOne(id, req.user.id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    const task = await this.tasksService.findOne(id, user.id);
     return { success: true, data: task };
   }
 
@@ -73,8 +74,8 @@ export class TasksController {
    */
   @Post()
   @ApiOperation({ summary: 'Tạo công việc mới' })
-  async create(@Body() dto: CreateTaskDto, @Request() req) {
-    const task = await this.tasksService.create(req.user.id, dto);
+  async create(@Body() dto: CreateTaskDto, @CurrentUser() user: RequestUser) {
+    const task = await this.tasksService.create(user.id, dto);
     return { success: true, data: task };
   }
 
@@ -87,9 +88,9 @@ export class TasksController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateTaskDto,
-    @Request() req,
+    @CurrentUser() user: RequestUser,
   ) {
-    const task = await this.tasksService.update(id, req.user.id, dto);
+    const task = await this.tasksService.update(id, user.id, dto);
     return { success: true, data: task };
   }
 
@@ -102,9 +103,9 @@ export class TasksController {
   async move(
     @Param('id') id: string,
     @Body() dto: MoveTaskDto,
-    @Request() req,
+    @CurrentUser() user: RequestUser,
   ) {
-    const task = await this.tasksService.move(id, req.user.id, dto);
+    const task = await this.tasksService.move(id, user.id, dto);
     return { success: true, data: task };
   }
 
@@ -114,8 +115,8 @@ export class TasksController {
    */
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa công việc' })
-  async remove(@Param('id') id: string, @Request() req) {
-    const result = await this.tasksService.remove(id, req.user.id);
+  async remove(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    const result = await this.tasksService.remove(id, user.id);
     return { success: true, data: result };
   }
 }

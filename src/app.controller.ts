@@ -1,12 +1,21 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('App')
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  /**
+   * Health check endpoint
+   * Dùng để kiểm tra server có đang chạy không
+   * Docker/Railway sẽ ping endpoint này
+   */
+  @Get('health')
+  @ApiOperation({ summary: 'Kiểm tra trạng thái server' })
+  healthCheck() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'taskflow-backend',
+    };
   }
 }
