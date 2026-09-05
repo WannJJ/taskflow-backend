@@ -1,0 +1,48 @@
+# ============================================
+# .dockerignore - Loại bỏ file không cần thiết khỏi Docker build context
+# Giúp giảm kích thước build context, tăng tốc build, bảo mật hơn
+# ============================================
+
+# Dependencies (sẽ được cài lại trong container)
+node_modules
+npm-debug.log
+
+# Build output (sẽ được tạo lại)
+dist
+
+# Environment files (KHÔNG BAO GIỜ copy .env vào image!)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+coverage
+*.test.ts
+*.spec.ts
+test
+jest.config.js
+
+# Logs
+logs
+*.log
+
+# Documentation
+README.md
+*.md
+
+# Prisma (schema.prisma vẫn cần, nhưng seed/migration dev không cần)
+prisma/seed.ts
